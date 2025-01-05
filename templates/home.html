@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disease Predictor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <div class="container">
+        <h1>Disease Predictor</h1>
+        <form id="symptom-form">
+            <label for="symptoms">Enter symptoms (comma-separated):</label>
+            <input type="text" id="symptoms" name="symptoms" required style="width: 500px;">
+            <button type="submit">Predict</button>
+        </form>
+        <div id="results"></div>
+    </div>
+    <script src="{{ url_for('static', filename='home.js') }}"></script>
+</body>
+
+</html>
