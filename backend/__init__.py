@@ -1,7 +1,6 @@
 from flask import Flask, request, jsonify, send_from_directory, render_template
 import numpy as np
 import statistics
-
 # Importing libraries
 import numpy as np
 import pandas as pd
@@ -27,14 +26,10 @@ from flask_cors import CORS
 
 app = Flask(
     __name__,
-    template_folder="C:/Users/Msys/Desktop/Disease-prediction(ML project)/templates",
-    static_folder="C:/Users/Msys/Desktop/Disease-prediction(ML project)/static",
+    template_folder="C:/Users/Msys/Desktop/Disease-prediction(ML project)/frontend//templates",
+    static_folder="C:/Users/Msys/Desktop/Disease-prediction(ML project)/frontend//static",
 )
 CORS(app)
-
-# Load your models and data here
-# Assuming `final_rf_model`, `final_svm_model`, `final_dt_model`, `data_dict` are already defined
-
 
 def data_processing(data):
     # List of target labels
@@ -46,7 +41,7 @@ def data_processing(data):
     )
 
     # Separate majority and minority classes
-    majority = data[data["prognosis"] == "not ill"]
+    majority = data[data["prognosis"] == "not Hypertension nor Diabetes"]
     minority_Hypertension = data[data["prognosis"] == "Hypertension"]
     minority_Diabetes = data[data["prognosis"] == "Diabetes"]
 
@@ -92,15 +87,6 @@ def predict():
         # Assume X is your feature matrix and y is your target variable
         selector = SelectKBest(score_func=chi2, k=10)  # Select top 10 features
         X = selector.fit_transform(XX, y)
-
-        # Get scores and feature indices
-        scores = selector.scores_
-        selected_features = selector.get_support(indices=True)
-        selected_columns = XX.columns[selector.get_support()].tolist()
-
-        # print("Selected feature indices:", selected_features)
-        # print("Feature scores:", scores)
-        # print("Selected columns:", selected_columns)
 
         # test data preprocessing
         test_data = pd.read_csv("backend/data/symptoms_Data_Testing.csv")
