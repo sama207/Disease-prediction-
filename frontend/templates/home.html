@@ -11,6 +11,14 @@
 <body>
     <div class="container">
         <h1>Disease Predictor</h1>
+        <p>
+            {% for symptom in symptoms %}
+
+            <li id="symp">{{symptom}}</li>
+            
+            {% endfor %}
+           
+        </p>
         <form id="symptom-form">
             <label for="symptoms">Enter symptoms (comma-separated):</label>
             <input type="text" id="symptoms" name="symptoms" required style="width: 500px;">
