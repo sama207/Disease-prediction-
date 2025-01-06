@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory, render_template
 import numpy as np
 import statistics
+
 # Importing libraries
 import numpy as np
 import pandas as pd
@@ -26,10 +27,17 @@ from flask_cors import CORS
 
 app = Flask(
     __name__,
-    template_folder="C:/Users/Msys/Desktop/Disease-prediction(ML project)/frontend//templates",
-    static_folder="C:/Users/Msys/Desktop/Disease-prediction(ML project)/frontend//static",
+    template_folder="C:/Users/Msys/Desktop/Disease-prediction(ML project)/frontend/templates",
+    static_folder="C:/Users/Msys/Desktop/Disease-prediction(ML project)/frontend/static",
 )
 CORS(app)
+
+
+# Reading the train.csv by removing the
+# last column since it's an empty column
+training_data = pd.read_csv("backend/data/symptoms_Data_Training.csv")
+training_data.drop(training_data.columns[-1], axis=1, inplace=True)
+
 
 def data_processing(data):
     # List of target labels
@@ -37,7 +45,7 @@ def data_processing(data):
 
     # 1. Change all rows not in target labels to "not ill"
     data["prognosis"] = data["prognosis"].apply(
-        lambda x: x if x in target_labels else "not ill"
+        lambda x: x if x in target_labels else "not Hypertension nor Diabetes"
     )
 
     # Separate majority and minority classes
@@ -63,19 +71,33 @@ def data_processing(data):
     return data
 
 
+def send_symptoms():
+    data = data_processing(training_data)
+    # Encoding the target value into numerical value using LabelEncoder
+    encoder = LabelEncoder()
+    data["prognosis"] = encoder.fit_transform(data["prognosis"])
+
+    XX = data.iloc[:, :-1]
+    y = data.iloc[:, -1]
+
+    # Assume X is your feature matrix and y is your target variable
+    selector = SelectKBest(score_func=chi2, k=10)  # Select top 10 features
+    X = selector.fit_transform(XX, y)
+
+    selected_columns = XX.columns[selector.get_support()].tolist()
+
+    return selected_columns
+
+
 @app.route("/")
 def home():
-    return render_template("home.html")
+    symptoms = send_symptoms()
+    return render_template("home.html",symptoms=symptoms)
 
 
 @app.route("/predict", methods=["POST"])
 def predict():
     try:
-        # Reading the train.csv by removing the
-        # last column since it's an empty column
-        training_data = pd.read_csv("backend/data/symptoms_Data_Training.csv")
-        training_data.drop(training_data.columns[-1], axis=1, inplace=True)
-
         data = data_processing(training_data)
         # Encoding the target value into numerical value using LabelEncoder
         encoder = LabelEncoder()
@@ -87,6 +109,15 @@ def predict():
         # Assume X is your feature matrix and y is your target variable
         selector = SelectKBest(score_func=chi2, k=10)  # Select top 10 features
         X = selector.fit_transform(XX, y)
+
+        # Get scores and feature indices
+        scores = selector.scores_
+        selected_features = selector.get_support(indices=True)
+        selected_columns = XX.columns[selector.get_support()].tolist()
+
+        # print("Selected feature indices:", selected_features)
+        # print("Feature scores:", scores)
+        # print("Selected columns:", selected_columns)
 
         # test data preprocessing
         test_data = pd.read_csv("backend/data/symptoms_Data_Testing.csv")
@@ -125,8 +156,9 @@ def predict():
             f1_score on Test dataset by the combined model: {f1_score(test_Y, final_preds,average="weighted")*100}"
         )
 
-        symptoms = request.json.get("symptoms")
+        symptoms = selected_columns
 
+        user_symptoms = request.json.get("symptoms")
 
         # Creating a symptom index dictionary to encode the
         # input symptoms into numerical form
@@ -182,7 +214,7 @@ def predict():
             return predictions
 
         # Testing the function
-        predictions = predictDisease(symptoms)
+        predictions = predictDisease(user_symptoms)
 
         print(predictions)
 
