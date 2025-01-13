@@ -1,26 +1,19 @@
-from flask import Flask, request, jsonify, send_from_directory, render_template
+from flask import Flask, request, jsonify, render_template
 import numpy as np
-import statistics
 
 # Importing libraries
 import numpy as np
 import pandas as pd
-from scipy.stats import mode
-import matplotlib.pyplot as plt
-import seaborn as sns
 from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.svm import SVC
-from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     accuracy_score,
-    confusion_matrix,
     precision_score,
     recall_score,
     f1_score,
 )
-from sklearn.utils import resample
+from imblearn.over_sampling import SMOTE
 from sklearn.feature_selection import SelectKBest, chi2
 from sklearn.tree import DecisionTreeClassifier
 from flask_cors import CORS
@@ -41,97 +34,67 @@ training_data.drop(training_data.columns[-1], axis=1, inplace=True)
 
 def data_processing(data):
     # List of target labels
-    target_labels = ["Diabetes", "Hypertension"]
+    target_labels = [
+        "Diabetes",
+        "Hypertension",
+        "Bronchial Asthma",
+        "Allergy",
+        "Common Cold",
+    ]
 
     # 1. Change all rows not in target labels to "not ill"
     data["prognosis"] = data["prognosis"].apply(
-        lambda x: x if x in target_labels else "not Hypertension nor Diabetes"
+        lambda x: x if x in target_labels else "not ill"
     )
-
-    # Separate majority and minority classes
-    majority = data[data["prognosis"] == "not Hypertension nor Diabetes"]
-    minority_Hypertension = data[data["prognosis"] == "Hypertension"]
-    minority_Diabetes = data[data["prognosis"] == "Diabetes"]
-
-    # Upsample minority class
-    minority_upsampled_Diabetes = resample(
-        minority_Diabetes, replace=True, n_samples=len(majority), random_state=42
-    )
-    minority_upsampled_Hypertension = resample(
-        minority_Hypertension, replace=True, n_samples=len(majority), random_state=42
-    )
-
-    # Combine with majority class
-    data = pd.concat(
-        [majority, minority_upsampled_Diabetes, minority_upsampled_Hypertension]
-    )
-
-    print(data["prognosis"].value_counts())
 
     return data
 
+data = data_processing(training_data)
+# Encoding the target value into numerical value using LabelEncoder
+encoder = LabelEncoder()
+data["prognosis"] = encoder.fit_transform(data["prognosis"])
 
-def send_symptoms():
-    data = data_processing(training_data)
-    # Encoding the target value into numerical value using LabelEncoder
-    encoder = LabelEncoder()
-    data["prognosis"] = encoder.fit_transform(data["prognosis"])
+XX = data.iloc[:, :-1]
+y = data.iloc[:, -1]
 
-    XX = data.iloc[:, :-1]
-    y = data.iloc[:, -1]
+sm = SMOTE(random_state=4)
 
-    # Assume X is your feature matrix and y is your target variable
-    selector = SelectKBest(score_func=chi2, k=10)  # Select top 10 features
-    X = selector.fit_transform(XX, y)
+XX, y = sm.fit_resample(XX, y)
 
-    selected_columns = XX.columns[selector.get_support()].tolist()
+# Assume X is your feature matrix and y is your target variable
+selector = SelectKBest(score_func=chi2, k=16)  # Select top 10 features
+X = selector.fit_transform(XX, y)
 
-    return selected_columns
-
-
+selected_columns = XX.columns[selector.get_support()].tolist()
+  
 @app.route("/")
 def home():
-    symptoms = send_symptoms()
-    return render_template("home.html",symptoms=symptoms)
+
+    return render_template("home.html", symptoms=selected_columns)
 
 
 @app.route("/predict", methods=["POST"])
 def predict():
     try:
-        data = data_processing(training_data)
-        # Encoding the target value into numerical value using LabelEncoder
-        encoder = LabelEncoder()
-        data["prognosis"] = encoder.fit_transform(data["prognosis"])
-
-        XX = data.iloc[:, :-1]
-        y = data.iloc[:, -1]
-
-        # Assume X is your feature matrix and y is your target variable
-        selector = SelectKBest(score_func=chi2, k=10)  # Select top 10 features
-        X = selector.fit_transform(XX, y)
-
-        # Get scores and feature indices
-        scores = selector.scores_
-        selected_features = selector.get_support(indices=True)
-        selected_columns = XX.columns[selector.get_support()].tolist()
-
-        # print("Selected feature indices:", selected_features)
-        # print("Feature scores:", scores)
-        # print("Selected columns:", selected_columns)
-
         # test data preprocessing
         test_data = pd.read_csv("backend/data/symptoms_Data_Testing.csv")
         test_data = data_processing(test_data)
         test_X = test_data.iloc[:, :-1]
         test_Y = encoder.transform(test_data.iloc[:, -1])
 
+        test_X, test_Y = sm.fit_resample(test_X, test_Y)
+
         test_X = selector.fit_transform(test_X, test_Y)
-        selected_features = selector.get_support(indices=True)
+        selected_columns = XX.columns[selector.get_support()].tolist()
 
         # Training the models on whole data
-        final_svm_model = SVC()
-        final_rf_model = RandomForestClassifier(random_state=18)
-        final_dt_model = DecisionTreeClassifier(criterion="gini")
+        final_svm_model = SVC(C=0.1, gamma=1)
+        final_rf_model = RandomForestClassifier(
+            random_state=18, max_depth=3, max_leaf_nodes=6
+        )
+        final_dt_model = DecisionTreeClassifier(
+            criterion="entropy", max_depth=6, random_state=1
+        )
 
         final_svm_model.fit(X, y)
         final_rf_model.fit(X, y)
